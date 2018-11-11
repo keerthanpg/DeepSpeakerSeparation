@@ -111,50 +111,36 @@ class MagnitudeSubNet(nn.Module):
 # model
 class PhaseSubNet(nn.Module):    
     def __init__(self):
-        super(MagnitudeSubNet, self).__init__()
+        super(PhaseSubNet, self).__init__()
 
-        self.vres = []
+        self.magn_sub_net = MagnitudeSubNet()
+        self.conv = []
         #convolution along time dimension
-        for i in range(10):
-            if(i == 0):
-                self.vres.append(ResidualBlock(512, 1536))
-            else:
-                self.vres.append(ResidualBlock(1536, 1536))
+        for i in range(6):
+            self.conv.append(ResidualBlock(1024, 1024))
 
-        self.ares = []
-        #audio
-        #determine input channel dimension
-        for i in range(5):
-            if(i % 2 != 0):
-                 self.ares.append(ResidualBlock(1536, 1536, 2))
-            else:
-                self.ares.append(ResidualBlock(1536, 1536))
+        #dimension input = concat of conv
+        #dimension output = same as noisy phase
+        self.project = nn.Linear(1024, 1024)
+        self.eps = 0.00000000001
+            
 
         
-        self.mag_res = []
-        for i in range(15):
-            if((i + 1)% 5 == 0):
-                self.magn_res.append(ResidualBlock(1536, 1536, transpose = True))
-            else:
-                self.magn_res.append(ResidualBlock(1536, 1536))
+    def forward(self, visual, noisy_phase, noisy_magn):
+        clean_magn = self.magn_sub_net(visual, noisy_magn)
+        #check dimension of cat, channel
+        fused_feats = torch.cat(clean_magn, noisy_phase, dim = 1)
+        for block in self.conv:
+            fused_feats = block(fused_feats)
 
-        
-    def forward(self, visual, audio):
-        for block in self.vres:
-            visual = block(visual)
+        phase_residual = self.project(fused_feats)
+        clean_phase = phase_residual + noisy_phase
 
-        for block in self.ares:
-            audio = block(audio)
+        #check over dimension
+        norm = clean_phase.norm(p=2, dim=1, keepdim=True)
+        clean_phase = clean_phase.div(norm.expand_as(clean_phase))
 
-        # need to figure out the exact dimension of concatenation
-        magn_feats = torch.cat(visual, audio, dim = 1)
+        return clean_magn, clean_phase
 
-        for block in self.magn_res:
-            magn_feats = block(magn_feats)
-
-        #sigmoid over which dimension
-        magn_feats = F.sigmoid(magn_feats, dim = 1)
-
-        return audio * magn_feats
 
 
