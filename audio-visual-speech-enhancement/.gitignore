@@ -1,0 +1,8 @@
+# python
+*.pyc
+
+# pycharm
+*.idea
+
+extracted_new.pickle
+preprocess.pkl

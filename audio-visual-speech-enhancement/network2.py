@@ -6,6 +6,19 @@ from torch.autograd import Variable
 from torch.utils.data import Dataset, DataLoader
 import torch.nn.utils.rnn as rnn
 import torchvision
+import data_loader
+
+
+class CustomDataSet(Dataset):
+
+    def __init__ (self,mode):
+        self.mode = modeclass CustomDataSet(Dataset):
+
+    def __getitem__(self,index):
+        if self.mode is 'train':
+            trainVideo, trainAudioMagnitude, trainAudioPhase = data_loader.getData(self.mode)
+    def __len__(self):
+        return self.trainVideo.shape[0]
 
 # model
 class VideoNet(nn.Module):    
@@ -142,5 +155,13 @@ class PhaseSubNet(nn.Module):
 
         return clean_magn, clean_phase
 
+def parse_arguments():
+    pass
 
 
+def main():
+    pass
+
+
+def train():
+    pass
