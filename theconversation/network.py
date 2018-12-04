@@ -82,7 +82,7 @@ class MagnitudeSubNet(nn.Module):
                 self.ares.append(ResidualBlock(1536, 1536))
 
         
-        self.mag_res = []
+        self.magn_res = []
         for i in range(15):
             if((i + 1)% 5 == 0):
                 self.magn_res.append(ResidualBlock(1536, 1536, transpose = True))
