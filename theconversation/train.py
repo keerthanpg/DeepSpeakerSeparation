@@ -12,7 +12,7 @@ import csv
 import pickle
 import network
 
-f = open('extracted_new.pickle', 'rb')
+f = open('processed.pickle', 'rb')
 data = pickle.load(f)
 
 N = len(data)
@@ -24,12 +24,21 @@ class SpeechDataset(Dataset):
 	def __init__(self,data, test=False):
 		self.data = data
 		self.test = test
+		for i in range(len(data)):
+			data[i]['video'] = torch.Tensor(data[i]['video']).cuda()
+			data[i]['noisyMagnitude'] = torch.Tensor(data[i]['noisyMagnitude']).cuda()
+			data[i]['noisyPhaseImag'] = torch.Tensor(data[i]['noisyPhaseImag']).cuda()
+			data[i]['noisyPhaseReal'] = torch.Tensor(data[i]['noisyPhaseReal']).cuda()		
+			data[i]['cleanMagnitude'] = torch.Tensor(data[i]['cleanMagnitude']).cuda()			
+			data[i]['cleanPhaseImag'] = torch.Tensor(data[i]['cleanPhaseImag']).cuda()
+			data[i]['cleanPhaseReal'] = torch.Tensor(data[i]['cleanPhaseReal']).cuda()			
 		
 	def __getitem__(self,i):
-		return self.data[i].cuda()	
+		return self.data[i]	
 
 	def __len__(self):
 		return len(self.data)
+
 
 class LanguageModel(nn.Module):    
     def __init__(self):
@@ -37,7 +46,8 @@ class LanguageModel(nn.Module):
         self.magnet= network.MagnitudeSubNet()
         self.phasenet = network.PhaseSubNet()
 
-    def forward(self, seq_list, lens):
+    def forward(self, inputs):
+    	print(inputs.shape)
         return scores
 
 
@@ -50,7 +60,8 @@ class Trainer:
         self.epochs = 0
         self.max_epochs = max_epochs
         self.optimizer = torch.optim.Adam(model.parameters(),lr=0.0001, weight_decay=1e-6)
-        self.criterion = torch.nn.CrossEntropyLoss().cuda()       
+        self.criterion = torch.nn.CrossEntropyLoss().cuda()     
+
 
     def train_epoch_packed(self, epoch, resume=0):
         batch_id=0
@@ -59,14 +70,14 @@ class Trainer:
         if(resume):
             checkpoint = torch.load('tmp/model'+ str(resume) +'.pkl')
             self.model.load_state_dict(checkpoint['model_state_dict'])
-            #self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])            
+            self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])            
 
-        for inputs, targets, i_lens, t_lens in self.train_loader: # lists, presorted, preloaded on GPU  
+        for inputs in self.train_loader: # lists, presorted, preloaded on GPU  
             self.model.train()          
             #print(batch_id)
             batch_id += 1
             #print(epoch, batch_id)
-            outputs = self.model(inputs, i_lens)
+            outputs = self.model(inputs)
             outputs = torch.transpose(outputs, 0, 1) #sequence length * batchsize *outputdim            
             loss = self.criterion(outputs.cpu(), torch.cat(targets).cpu(), i_lens.cpu(), t_lens.cpu()).cuda()
             sum_loss += loss.item()
@@ -170,7 +181,7 @@ val_loader = DataLoader(val_dataset, shuffle=True, batch_size=32)
 trainer = Trainer(model, train_loader, val_loader, max_epochs = 10000)
 resume = -1
 flag = 1
-'''
+
 for i in range(resume + 1, 100000):
     if(flag == 0):
         trainer.train_epoch_packed(i, resume=resume)
@@ -184,6 +195,6 @@ for i in range(resume + 1, 100000):
     f = open('valid_logger.txt', 'a')
     f.write(str(i) + ' ' + ' ' + str(avg_valid_loss) + ' ' + str(avg_ldist) + '\n')
     f.close()
-    trainer.save(i)'''
+    trainer.save(i)
 
 trainer.run_test(76)
