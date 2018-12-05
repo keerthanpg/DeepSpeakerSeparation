@@ -46,14 +46,14 @@ class ResidualBlock(nn.Module):
         for m in self.modules():
             if isinstance(m, nn.Conv1d):
                 nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
-            elif isinstance(m, nn.BatchNorm1d):
+            elif isinstance(m, nn.BatchNorm2d):
                 nn.init.constant_(m.weight, 1)
                 nn.init.constant_(m.bias, 0)
         
         
     def forward(self, x):
         residual = x
-        out = self.relu1(x)
+        out = self.relu1(residual)
         out = self.bn1(out)
         out = self.conv1(out)
         out += residual
@@ -127,7 +127,7 @@ class PhaseSubNet(nn.Module):
             
 
         
-    def forward(self, noisy_phase, clean_magn):
+    def forward(self, visual, noisy_phase, clean_magn):
         
         #check dimension of cat, channel
         fused_feats = torch.cat(clean_magn, noisy_phase, dim = 1)
