@@ -26,7 +26,7 @@ def return_data(mode):
 	pickle_out = open("extracted_new.pickle","wb")
 	pickle.dump(contents, pickle_out)
 	pickle_out.close()
-	pdb.set_trace()
+	# pdb.set_trace()
 	trainSize = int(0.8*len(contents))
 	contents = np.array(contents)
 	if mode is 'train':	
