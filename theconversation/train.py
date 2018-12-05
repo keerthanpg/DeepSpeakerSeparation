@@ -53,17 +53,26 @@ class LanguageModel(nn.Module):
 		cleanMagnitude = inputs[2]
 		noisyPhase = inputs[3]
 		cleanPhase = inputs[4]
+		# this is high level flow	
+		visual = self.videonet(video) #this is buggy, my job is to get this working			
+		clean_magn = self.magnet(visual, noisy_magn) #this is buggy, Danendra's job is to get this working
+		clean_phase = self.phasenet(noisy_phase, clean_magn) #this is buggy, Suyash'a job is to get this working
+
+		'''
 		pdb.set_trace()
 		video_features = self.videonet(video[:,1, :, :, : ].unsqueeze(1))
 		pdb.set_trace()
+		
+
 
 		
 		for i in range(video.shape[1]):
 			video[:,i, :, :, : ].unsqueeze(1).shape
-			video_features = self.videonet(video[:,i, :, :, : ].unsqueeze(1))
+			video_features = self.videonet(video[:,i, :, :, : ].unsqueeze(1))'''
 
-
-		return scores
+		#TODO: calculate magn_loss
+		#TODO: calculate phase loss
+		return magn_loss, phase_loss, clean_phase, clean_magn
 
 
 # model trainer
