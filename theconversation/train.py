@@ -21,18 +21,18 @@ dev_data = data[int(0.8*N):]
 
 
 class SpeechDataset(Dataset):
-	def __init__(self,data, test=False):
-		self.data = data
-		self.test = test
-		for i in range(len(data)):
-			for j in range(len(data[i])):
-				data[i][j] = torch.Tensor(data[i][j]).cuda()
+    def __init__(self,data, test=False):
+        self.data = data
+        self.test = test
+        for i in range(len(data)):
+            for j in range(len(data[i])):
+                data[i][j] = torch.Tensor(data[i][j]).cuda()
 
-	def __getitem__(self,i):
-		return self.data[i]	
+    def __getitem__(self,i):
+        return self.data[i]	
 
-	def __len__(self):
-		return len(self.data)
+    def __len__(self):
+        return len(self.data)
 
 
 class LanguageModel(nn.Module):    
@@ -42,12 +42,15 @@ class LanguageModel(nn.Module):
         self.phasenet = network.PhaseSubNet()
 
     def forward(self, inputs):
-    	video = inputs[0]
-    	noisyMagnitude = inputs[1]
-    	cleanMagnitude = inputs[2]
-		noisyPhase = inputs[3]
-		cleanPhase = inputs[4]
-    	return scores
+        video = inputs[0]
+        noisyMagnitude = inputs[1]
+        cleanMagnitude = inputs[2]
+        noisyPhase = inputs[3]
+        cleanPhase = inputs[4]
+
+        self.magnet.forward(video, noisyMagnitude)
+
+        return scores
 
 
 # model trainer
@@ -175,8 +178,8 @@ class Trainer:
 model = LanguageModel().cuda()
 train_dataset = SpeechDataset(train_data)
 val_dataset = SpeechDataset(dev_data)
-train_loader = DataLoader(train_dataset, shuffle=True, batch_size=32)
-val_loader = DataLoader(val_dataset, shuffle=True, batch_size=32)
+train_loader = DataLoader(train_dataset, shuffle=True, batch_size=1)
+val_loader = DataLoader(val_dataset, shuffle=True, batch_size=1)
 
 trainer = Trainer(model, train_loader, val_loader, max_epochs = 10000)
 resume = -1
