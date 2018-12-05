@@ -54,7 +54,10 @@ class LanguageModel(nn.Module):
 		noisyPhase = inputs[3]
 		cleanPhase = inputs[4]
 		# this is high level flow	
-		visual = self.videonet(video) #this is buggy, my job is to get this working			
+		 #this is buggy, my job is to get this working	
+		for i in range(video.shape[1]):
+			visual = self.videonet(video[:, i, :, :, :].unsqueeze(1))
+
 		clean_magn = self.magnet(visual, noisy_magn) #this is buggy, Danendra's job is to get this working
 		clean_phase = self.phasenet(noisy_phase, clean_magn) #this is buggy, Suyash'a job is to get this working
 
@@ -200,8 +203,8 @@ class Trainer:
 model = LanguageModel().cuda()
 train_dataset = SpeechDataset(train_data)
 val_dataset = SpeechDataset(dev_data)
-train_loader = DataLoader(train_dataset, shuffle=True, batch_size=32)
-val_loader = DataLoader(val_dataset, shuffle=True, batch_size=32)
+train_loader = DataLoader(train_dataset, shuffle=True, batch_size=1)
+val_loader = DataLoader(val_dataset, shuffle=True, batch_size=1)
 
 trainer = Trainer(model, train_loader, val_loader, max_epochs = 10000)
 resume = -1
