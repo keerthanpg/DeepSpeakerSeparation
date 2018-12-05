@@ -6,7 +6,9 @@ from torch.autograd import Variable
 from torch.utils.data import Dataset, DataLoader
 import torch.nn.utils.rnn as rnn
 import torchvision
+import pdb
 import resnet
+
 
 # model
 class VideoNet(nn.Module):    
@@ -25,7 +27,6 @@ class VideoNet(nn.Module):
         features = self.bn1(features)
         features = self.relu(features)
         #features = self.maxpool(features)
-        print(features.shape)
         features = self.resnet18(features)
         return features
 
@@ -33,15 +34,15 @@ class VideoNet(nn.Module):
 class ResidualBlock(nn.Module):
     def __init__(self, in_channels, out_channels, stride=1, transpose=False):
         super(ResidualBlock, self).__init__()
-        self.relu1 = nn.ReLU(inplace=True)
-        self.bn1 = nn.BatchNorm1d(out_channels)
+        self.relu1 = nn.ReLU(inplace=True).cuda()
+        self.bn1 = nn.BatchNorm1d(80).cuda()
         
         if not transpose:
             self.conv1 = nn.Conv1d(in_channels, out_channels, kernel_size=5, 
-                         stride=stride, padding=0, bias=False)
+                         stride=stride, padding=2, bias=False).cuda()
         else:
             self.conv1 = nn.ConvTranspose1d(in_channels, out_channels, kernel_size=5, 
-                         stride=2, padding=0, output_padding=0, groups=1, bias=True, dilation=1)
+                         stride=2, padding=0, output_padding=0, groups=1, bias=True, dilation=1).cuda()
 
         for m in self.modules():
             if isinstance(m, nn.Conv1d):
@@ -52,8 +53,8 @@ class ResidualBlock(nn.Module):
         
         
     def forward(self, x):
-        residual = x
-        out = self.relu1(residual)
+        residual = x.cuda()
+        out = self.relu1(x)
         out = self.bn1(out)
         out = self.conv1(out)
         out += residual
@@ -118,21 +119,22 @@ class PhaseSubNet(nn.Module):
         self.conv = []
         #convolution along time dimension
         for i in range(6):
-            self.conv.append(ResidualBlock(1024, 1024))
+            self.conv.append(ResidualBlock(80, 80))
 
         #dimension input = concat of conv
         #dimension output = same as noisy phase
-        self.project = nn.Linear(1024, 1024)
+        self.project = nn.Linear(40,20)
         self.eps = 0.00000000001
             
 
         
-    def forward(self, visual, noisy_phase, clean_magn):
+    def forward(self, noisy_phase, clean_magn):
         
         #check dimension of cat, channel
-        fused_feats = torch.cat(clean_magn, noisy_phase, dim = 1)
+        fused_feats = torch.cat((clean_magn, noisy_phase), dim = -1)
         for block in self.conv:
             fused_feats = block(fused_feats)
+
 
         phase_residual = self.project(fused_feats)
         clean_phase = phase_residual + noisy_phase
