@@ -112,8 +112,7 @@ class MagnitudeSubNet(nn.Module):
 class PhaseSubNet(nn.Module):    
     def __init__(self):
         super(PhaseSubNet, self).__init__()
-
-        self.magn_sub_net = MagnitudeSubNet()
+        
         self.conv = []
         #convolution along time dimension
         for i in range(6):
@@ -126,8 +125,8 @@ class PhaseSubNet(nn.Module):
             
 
         
-    def forward(self, visual, noisy_phase, noisy_magn):
-        clean_magn = self.magn_sub_net(visual, noisy_magn)
+    def forward(self, visual, noisy_phase, clean_magn):
+        
         #check dimension of cat, channel
         fused_feats = torch.cat(clean_magn, noisy_phase, dim = 1)
         for block in self.conv:
@@ -140,7 +139,7 @@ class PhaseSubNet(nn.Module):
         norm = clean_phase.norm(p=2, dim=1, keepdim=True)
         clean_phase = clean_phase.div(norm.expand_as(clean_phase))
 
-        return clean_magn, clean_phase
+        return clean_phase
 
 
 
