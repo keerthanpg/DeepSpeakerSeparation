@@ -6,6 +6,7 @@ from torch.autograd import Variable
 from torch.utils.data import Dataset, DataLoader
 import torch.nn.utils.rnn as rnn
 import torchvision
+import resnet
 
 # model
 class VideoNet(nn.Module):    
@@ -17,13 +18,14 @@ class VideoNet(nn.Module):
         self.bn1 = nn.BatchNorm3d(64)
         self.relu = nn.ReLU()
         self.maxpool = nn.MaxPool3d(kernel_size=(1,3,3), stride=(1,2,2), padding=(0,1,1), dilation=1, return_indices=False, ceil_mode=False)
-        self.resnet18 = torchvision.models.resnet18()
+        self.resnet18 = resnet.resnet18(sample_size=32, sample_duration=1)
         
     def forward(self, video):
         features = self.Conv3d(video)
         features = self.bn1(features)
         features = self.relu(features)
-        features = self.maxpool(features)
+        #features = self.maxpool(features)
+        print(features.shape)
         features = self.resnet18(features)
         return features
 

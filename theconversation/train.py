@@ -53,10 +53,13 @@ class LanguageModel(nn.Module):
 		cleanMagnitude = inputs[2]
 		noisyPhase = inputs[3]
 		cleanPhase = inputs[4]
-		# this is high level flow	
-		 #this is buggy, my job is to get this working	
+
 		for i in range(video.shape[1]):
-			visual = self.videonet(video[:, i, :, :, :].unsqueeze(1))
+
+			visual = video[:, i, 8:120, 8:120, :].unsqueeze(1) #batch * t * w * h * c
+			#but i want batch*t*c *w*h
+			visual = visual.contiguous().view(visual.shape[0], visual.shape[1], visual.shape[4], visual.shape[2], visual.shape[3])
+			visual = self.videonet(visual)
 
 		clean_magn = self.magnet(visual, noisy_magn) #this is buggy, Danendra's job is to get this working
 		clean_phase = self.phasenet(noisy_phase, clean_magn) #this is buggy, Suyash'a job is to get this working
