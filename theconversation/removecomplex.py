@@ -1,5 +1,6 @@
 import pickle
 import network
+import numpy as np
 
 f = open('extracted_new.pickle', 'rb')
 data = pickle.load(f)
@@ -7,20 +8,25 @@ data = pickle.load(f)
 data_new = []
 
 for i in range(len(data)):
-	data[i]['noisyPhaseImag'] = data[i]['noisyPhase'].imag
-	data[i]['noisyPhaseReal'] = data[i]['noisyPhase'].real
+	noisy_imag = data[i]['noisyPhase'].imag
+	noisy_real = data[i]['noisyPhase'].real
 	data[i].pop('noisyPhase') 
+	data[i]['noisyPhase'] = np.arctan(np.divide(noisy_imag,noisy_real))	
 	
-	data[i]['cleanPhaseImag'] = data[i]['cleanPhase'].imag
-	data[i]['cleanPhaseReal'] = data[i]['cleanPhase'].real
-	data[i].pop('cleanPhase')
+
+	clean_imag = data[i]['cleanPhase'].imag
+	clean_real = data[i]['cleanPhase'].real
+	data[i].pop('cleanPhase') 
+	data[i]['cleanPhase'] = np.arctan(np.divide(clean_imag,clean_real))
+
 	sample = []
 	sample.append(data[i]['video'])
 	sample.append(data[i]['noisyMagnitude'])
 	sample.append(data[i]['cleanMagnitude'])
-	sample.append(data[i]['noisyPhaseImag'])
-	sample.append(data[i]['noisyPhaseReal'])
-	sample.append(data[i]['cleanPhaseImag'])
-	sample.append(data[i]['cleanPhaseReal'])
+	sample.append(data[i]['noisyPhase'])
+	sample.append(data[i]['cleanPhase'])
+	data_new.append(sample)
 
-pickle.dump(data, open('processed.pickle', 'wb'))
+
+
+pickle.dump(data_new, open('processed.pickle', 'wb'))

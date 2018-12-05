@@ -25,14 +25,9 @@ class SpeechDataset(Dataset):
 		self.data = data
 		self.test = test
 		for i in range(len(data)):
-			data[i]['video'] = torch.Tensor(data[i]['video']).cuda()
-			data[i]['noisyMagnitude'] = torch.Tensor(data[i]['noisyMagnitude']).cuda()
-			data[i]['noisyPhaseImag'] = torch.Tensor(data[i]['noisyPhaseImag']).cuda()
-			data[i]['noisyPhaseReal'] = torch.Tensor(data[i]['noisyPhaseReal']).cuda()		
-			data[i]['cleanMagnitude'] = torch.Tensor(data[i]['cleanMagnitude']).cuda()			
-			data[i]['cleanPhaseImag'] = torch.Tensor(data[i]['cleanPhaseImag']).cuda()
-			data[i]['cleanPhaseReal'] = torch.Tensor(data[i]['cleanPhaseReal']).cuda()			
-		
+			for j in range(len(data[i])):
+				data[i][j] = torch.Tensor(data[i][j]).cuda()
+
 	def __getitem__(self,i):
 		return self.data[i]	
 
@@ -47,8 +42,12 @@ class LanguageModel(nn.Module):
         self.phasenet = network.PhaseSubNet()
 
     def forward(self, inputs):
-    	print(inputs.shape)
-        return scores
+    	video = inputs[0]
+    	noisyMagnitude = inputs[1]
+    	cleanMagnitude = inputs[2]
+		noisyPhase = inputs[3]
+		cleanPhase = inputs[4]
+    	return scores
 
 
 # model trainer
@@ -73,7 +72,8 @@ class Trainer:
             self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])            
 
         for inputs in self.train_loader: # lists, presorted, preloaded on GPU  
-            self.model.train()          
+            self.model.train()  
+
             #print(batch_id)
             batch_id += 1
             #print(epoch, batch_id)
