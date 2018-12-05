@@ -11,6 +11,7 @@ import Levenshtein as L
 import csv
 import pickle
 import network
+import videonetwork
 import pdb
 
 f = open('processed.pickle', 'rb')
@@ -39,7 +40,9 @@ class SpeechDataset(Dataset):
 class LanguageModel(nn.Module):    
 	def __init__(self):
 		super(LanguageModel, self).__init__()
-		self.videonet = network.VideoNet()
+		#self.videonet = network.VideoNet()     
+		self.videonet = videonetwork.lipreading('temporalConv')
+		self.videonet.load_state_dict(torch.load('Video_only_model.pt'))
 		self.magnet= network.MagnitudeSubNet()
 		self.phasenet = network.PhaseSubNet()
 
@@ -51,8 +54,11 @@ class LanguageModel(nn.Module):
 		noisyPhase = inputs[3]
 		cleanPhase = inputs[4]
 		pdb.set_trace()
+		video_features = self.videonet(video[:,1, :, :, : ].unsqueeze(1))
+		pdb.set_trace()
+
 		
-		for i in range(video.size(1)):
+		for i in range(video.shape[1]):
 			video[:,i, :, :, : ].unsqueeze(1).shape
 			video_features = self.videonet(video[:,i, :, :, : ].unsqueeze(1))
 
