@@ -42,24 +42,24 @@ class LanguageModel(nn.Module):
 		super(LanguageModel, self).__init__()
 		#self.videonet = network.VideoNet()     
 		self.videonet = videonetwork.lipreading('temporalConv')
-		self.videonet.load_state_dict(torch.load('Video_only_model.pt'))
+		# self.videonet.load_state_dict(torch.load('Video_only_model.pt'))
 		self.magnet= network.MagnitudeSubNet()
 		self.phasenet = network.PhaseSubNet()
 
 	def forward(self, inputs):
 
 		video = inputs[0]
-		noisyMagnitude = inputs[1]
-		cleanMagnitude = inputs[2]
-		noisyPhase = inputs[3]
-		cleanPhase = inputs[4]
+		noisyMagnitude = inputs[1].cuda()
+		cleanMagnitude = inputs[2].cuda()
+		noisyPhase = inputs[3].cuda()
+		cleanPhase = inputs[4].cuda()
+		phasenet_output = torch.tensor([]).cuda()
 		# this is high level flow	
 		 #this is buggy, my job is to get this working	
 		for i in range(video.shape[1]):
-			visual = self.videonet(video[:, i, :, :, :].unsqueeze(1))
-
-		clean_magn = self.magnet(visual, noisy_magn) #this is buggy, Danendra's job is to get this working
-		clean_phase = self.phasenet(noisy_phase, clean_magn) #this is buggy, Suyash'a job is to get this working
+			# visual = self.videonet(video[:, i, :, :, :].unsqueeze(1))
+			# clean_magn = self.magnet(visual, noisy_magn) #this is buggy, Danendra's job is to get this working
+			phasenet_output = torch.cat(((self.phasenet(noisyPhase[:,i].squeeze(1), cleanMagnitude[:,i].squeeze(1)).unsqueeze(1)),phasenet_output),dim=1)#this is buggy, Suyash'a job is to get this working
 
 		'''
 		pdb.set_trace()
@@ -76,7 +76,6 @@ class LanguageModel(nn.Module):
 		#TODO: calculate magn_loss
 		#TODO: calculate phase loss
 		return magn_loss, phase_loss, clean_phase, clean_magn
-
 
 # model trainer
 class Trainer:
@@ -203,7 +202,7 @@ class Trainer:
 model = LanguageModel().cuda()
 train_dataset = SpeechDataset(train_data)
 val_dataset = SpeechDataset(dev_data)
-train_loader = DataLoader(train_dataset, shuffle=True, batch_size=1)
+train_loader = DataLoader(train_dataset, shuffle=True, batch_size=2)
 val_loader = DataLoader(val_dataset, shuffle=True, batch_size=1)
 
 trainer = Trainer(model, train_loader, val_loader, max_epochs = 10000)
