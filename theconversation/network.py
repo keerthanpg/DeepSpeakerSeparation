@@ -96,11 +96,11 @@ class MagnitudeSubNet(nn.Module):
                 self.magn_res.append(ResidualBlock(80, 80))
 
         
-    def forward(self, visual, audio):
+    def forward(self, visual, audio, batch_size):
 
         originalAudio = audio
         visual = self.LinearizeShape(visual)
-        visual = visual.reshape((32,80,20))
+        visual = visual.reshape((batch_size,80,20))
 
         for block in self.vres:
             visual = block(visual)

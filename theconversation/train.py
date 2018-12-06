@@ -62,7 +62,7 @@ class LanguageModel(nn.Module):
             #but i want batch*t*c *w*h
             visual = visual.contiguous().view(visual.shape[0], visual.shape[1], visual.shape[4], visual.shape[2], visual.shape[3])
             visual = self.videonet(visual)
-            clean_magn = self.magnet(visual, noisyMagnitude[:,i]).unsqueeze(1) #this is buggy, Danendra's job is to get this working
+            clean_magn = self.magnet(visual, noisyMagnitude[:,i], video.shape[0]).unsqueeze(1) #this is buggy, Danendra's job is to get this working
             magnet_output = torch.cat((magnet_output, clean_magn), dim=1)
             clean_phase = self.phasenet(noisyPhase[:,i].squeeze(1), magnet_output[:,i].squeeze(1)).unsqueeze(1)
             phasenet_output = torch.cat((phasenet_output, clean_phase), dim=1)
@@ -190,7 +190,7 @@ model = LanguageModel().cuda()
 train_dataset = SpeechDataset(train_data)
 val_dataset = SpeechDataset(dev_data)
 
-train_loader = DataLoader(train_dataset, shuffle=True, batch_size=32)
+train_loader = DataLoader(train_dataset, shuffle=True, batch_size=4)
 val_loader = DataLoader(val_dataset, shuffle=True, batch_size=1)
 
 trainer = Trainer(model, train_loader, val_loader, max_epochs = 10000)
