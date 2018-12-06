@@ -45,6 +45,7 @@ class LanguageModel(nn.Module):
         #self.videonet.load_state_dict(torch.load('Video_only_model.pt'))
         self.magnet= network.MagnitudeSubNet()
         self.phasenet = network.PhaseSubNet()
+        #self.phase_criterion = torch.nn.functional.cosine_similarity(x1, x2, dim=1, eps=1e-8) → Tensor
 
     def forward(self, inputs):
 
@@ -55,6 +56,8 @@ class LanguageModel(nn.Module):
         cleanPhase = inputs[4]
         phasenet_output = torch.tensor([]).cuda()
         magnet_output = torch.tensor([]).cuda()
+        print(cleanPhase.shape)
+
 
 
         for i in range(video.shape[1]):
@@ -64,9 +67,17 @@ class LanguageModel(nn.Module):
             visual = self.videonet(visual)
             print(visual.shape) # why is this 32 x 2048?? Fix it Keerthana!
             clean_magn = torch.cat(((self.magnet(visual, noisyMagnitude[:,i]).unsqueeze(1)),magnet_output),dim = 1) #this is buggy, Danendra's job is to get this working
-            clean_phase = torch.cat(((self.phasenet(noisyPhase[:,i].squeeze(1), cleanMagnitude[:,i].squeeze(1)).unsqueeze(1)),phasenet_output),dim=1)
+            clean_phase = self.phasenet(noisyPhase[:,i].squeeze(1), cleanMagnitude[:,i].squeeze(1)).unsqueeze(1)
+            phasenet_output = torch.cat((phasenet_output, clean_phase), dim=1)
 
-        return magn_loss, phase_loss, clean_phase, clean_magn
+        
+        print(phasenet_output.shape)    
+
+        phase_similarity = F.cosine_similarity(input1, input2)
+
+
+
+        return magn_loss, phase_similarity, clean_phase, clean_magn
 
 # model trainer
 class Trainer:
