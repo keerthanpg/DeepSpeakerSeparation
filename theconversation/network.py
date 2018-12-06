@@ -67,13 +67,16 @@ class MagnitudeSubNet(nn.Module):
     def __init__(self):
         super(MagnitudeSubNet, self).__init__()
 
+        self.LinearizeShape = nn.Linear(2048, 1600)
+        self.outputLineaize = nn.Linear(40,20)
+
         self.vres = []
         #convolution along time dimension
         for i in range(10):
             if(i == 0):
-                self.vres.append(ResidualBlock(512, 1536))
+                self.vres.append(ResidualBlock(80, 80))
             else:
-                self.vres.append(ResidualBlock(1536, 1536))
+                self.vres.append(ResidualBlock(80, 80))
 
         self.ares = []
         #audio
@@ -88,28 +91,34 @@ class MagnitudeSubNet(nn.Module):
         self.magn_res = []
         for i in range(15):
             if((i + 1)% 5 == 0):
-                self.magn_res.append(ResidualBlock(1536, 1536, transpose = True))
+                self.magn_res.append(ResidualBlock(80, 80))
             else:
-                self.magn_res.append(ResidualBlock(1536, 1536))
+                self.magn_res.append(ResidualBlock(80, 80))
 
         
     def forward(self, visual, audio):
-        # for block in self.vres:
-        #     visual = block(visual)
+
+        originalAudio = audio
+        visual = self.LinearizeShape(visual)
+        visual = visual.reshape((32,80,20))
+
+        for block in self.vres:
+            visual = block(visual)
 
         for block in self.ares:
             audio = block(audio)
 
         # concatenation over channels
-        magn_feats = torch.cat(visual, audio, dim = -1)
+        magn_feats = torch.cat((visual, audio), dim = -1)
 
         for block in self.magn_res:
             magn_feats = block(magn_feats)
 
         #sigmoid over which dimension
-        magn_feats = F.sigmoid(magn_feats, dim = 1)
+        magn_feats = F.sigmoid(magn_feats)
+        magn_feats = self.outputLineaize(magn_feats)
 
-        return audio * magn_feats
+        return originalAudio * magn_feats
 
 # model
 class PhaseSubNet(nn.Module):    
