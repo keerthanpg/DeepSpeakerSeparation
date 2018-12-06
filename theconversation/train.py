@@ -62,13 +62,12 @@ class LanguageModel(nn.Module):
             #but i want batch*t*c *w*h
             visual = visual.contiguous().view(visual.shape[0], visual.shape[1], visual.shape[4], visual.shape[2], visual.shape[3])
             visual = self.videonet(visual)
-            print(visual.shape) # why is this 32 x 2048?? Fix it Keerthana!
-            clean_magn = torch.cat(((self.magnet(visual, noisyMagnitude[:,i]).unsqueeze(1)),magnet_output),dim = 1) #this is buggy, Danendra's job is to get this working
+            #clean_magn = torch.cat(((self.magnet(visual, noisyMagnitude[:,i]).unsqueeze(1)),magnet_output),dim = 1) #this is buggy, Danendra's job is to get this working
             clean_phase = self.phasenet(noisyPhase[:,i].squeeze(1), cleanMagnitude[:,i].squeeze(1)).unsqueeze(1)
             phasenet_output = torch.cat((phasenet_output, clean_phase), dim=1)
 
-        magn_loss = F.l1_loss(cleanMagnitude, cleanMagnitude, reduce=False).sum((1, 2, 3))
-        phase_similarity = F.cosine_similarity(phasenet_output, cleanPhase, dim=2).sum((1, 2))
+        magn_loss = F.l1_loss(cleanMagnitude, cleanMagnitude, reduce=False).sum((1, 2, 3)).mean(dim=0)
+        phase_similarity = -1*F.cosine_similarity(phasenet_output, cleanPhase, dim=2).sum((1, 2)).mean(dim=0)
         
         return magn_loss, phase_similarity, magnet_output, phasenet_output
 
@@ -81,71 +80,61 @@ class Trainer:
         self.epochs = 0
         self.max_epochs = max_epochs
         self.optimizer = torch.optim.Adam(model.parameters(),lr=0.0001, weight_decay=1e-6)
-        self.criterion = torch.nn.CrossEntropyLoss().cuda()     
+  
 
 
     def train_epoch_packed(self, epoch, resume=0):
         batch_id=0
         sum_loss = 0
-        freq = 10
+        sum_similarity = 0
+        freq = 1
         if(resume):
             checkpoint = torch.load('tmp/model'+ str(resume) +'.pkl')
             self.model.load_state_dict(checkpoint['model_state_dict'])
             self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])            
 
         for inputs in self.train_loader: # lists, presorted, preloaded on GPU  
-            self.model.train()  
-
+            self.model.train() 
             #print(batch_id)
             batch_id += 1
             #print(epoch, batch_id)
-            outputs = self.model(inputs)
-            outputs = torch.transpose(outputs, 0, 1) #sequence length * batchsize *outputdim            
-            loss = self.criterion(outputs.cpu(), torch.cat(targets).cpu(), i_lens.cpu(), t_lens.cpu()).cuda()
-            sum_loss += loss.item()
+            magn_loss, phase_similarity, magnet_output, phasenet_output = self.model(inputs)           
+            sum_loss += magn_loss.item()
+            sum_similarity += phase_similarity.item()
+            var_magn_loss = Variable(magn_loss.data, requires_grad=True)
             self.optimizer.zero_grad()
-            loss.backward()
+            var_magn_loss.backward()
+            phase_similarity.backward()
             self.optimizer.step()
+
             if batch_id % freq == 0:
                 lpw = sum_loss / freq
+                spw = sum_similarity/ freq
                 sum_loss = 0
                 #avg_valid_loss, avg_ldist = self.run_eval()
                 avg_valid_loss = 0
                 avg_ldist = 0
-                print("Epoch:", epoch, " batch_id:", batch_id, " Avg train loss:", lpw," Avg train perplexity:",np.exp(lpw))
+                print("Epoch:", epoch, " batch_id:", batch_id, " Avg train magn loss:", lpw, " Avg magnitude similarity:", spw)
                 f = open('logger.txt', 'a')
-                f.write(str(epoch) + ' ' + str(batch_id) + ' ' + str(lpw) + '\n')
+                f.write(str(epoch) + ' ' + str(batch_id) + ' ' + str(lpw) + ' ' + str(spw) + '\n')
                 f.close()                               
 
 
     def run_eval(self):
         self.model.eval()
-        val_loss = 0
+        sum_loss = 0
+        sum_similarity = 0
         batch_id=0
-        ls = 0.
-        n_words = 0
-        for inputs, targets, i_lens, t_lens in self.val_loader:
-            n_words += sum(i_lens)
+       
+        for inputs in self.val_loader: # lists, presorted, preloaded on GPU  
+            self.model.eval() 
+            #print(batch_id)
             batch_id += 1
-            outputs = self.model(inputs, i_lens)
-            outputs = torch.transpose(outputs, 0, 1) #sequence length * batchsize *outputdim            
-            loss = self.criterion(outputs.cpu(), torch.cat(targets).cpu(), i_lens.cpu(), t_lens.cpu())
-            val_loss += loss.item()
-            outputs = torch.transpose(outputs, 0, 1) #batch * sequence length *outputdim
-            probs = F.softmax(outputs, dim=2)
-            #print(i_lens.shape)
-
-            output, scores, timesteps, out_seq_len = self.decoder.decode(probs=probs, seq_lens=i_lens)
-            batch_ls= 0.0
-
-            for i in range(output.size(0)):
-                pred = "".join(self.label_map[o] for o in output[i, 0, :out_seq_len[i, 0]])
-                true = "".join(self.label_map[l] for l in targets[i])
-                #print("Pred: {}, True: {}".format(pred, true))
-                batch_ls += L.distance(pred, true)
-            #assert pos == labels.size(0)
-            ls += batch_ls/len(inputs)
-        return val_loss/batch_id, ls / batch_id
+            #print(epoch, batch_id)
+            magn_loss, phase_similarity, magnet_output, phasenet_output = self.model(inputs)           
+            sum_loss += magn_loss.item()
+            sum_similarity += phase_similarity.item()  
+        return sum_loss/batch_id, sum_similarity / batch_id
 
 
     def run_test(self, epoch):        
@@ -213,10 +202,11 @@ for i in range(resume + 1, 100000):
         trainer.train_epoch_packed(i)
 
     #trainer.run_eval()
-    avg_valid_loss, avg_ldist = trainer.run_eval()
-    print("Epoch:", i, " Avg_valid_loss:", avg_valid_loss, " avg_levenstein:", avg_ldist)
+    avg_valid_magn_loss, avg_valid_phase_similarity = trainer.run_eval()
+
+    print("Epoch:", i, " Avg_valid_magn_loss:", avg_valid_magn_loss, " avg_valid_phase_similarity:", avg_valid_phase_similarity)
     f = open('valid_logger.txt', 'a')
-    f.write(str(i) + ' ' + ' ' + str(avg_valid_loss) + ' ' + str(avg_ldist) + '\n')
+    f.write(str(i) + ' ' + ' ' + str(avg_valid_magn_loss) + ' ' + str(avg_valid_phase_similarity) + '\n')
     f.close()
     trainer.save(i)
 

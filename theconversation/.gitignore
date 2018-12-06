@@ -1,3 +1,6 @@
 extracted_new.pickle
 processed.pickle
 Video_only_model.pt
+tmp/
+logger.txt
+valid_logger.txt
