@@ -67,7 +67,7 @@ class LanguageModel(nn.Module):
             clean_phase = self.phasenet(noisyPhase[:,i].squeeze(1), magnet_output[:,i].squeeze(1)).unsqueeze(1)
             phasenet_output = torch.cat((phasenet_output, clean_phase), dim=1)
 
-        magn_loss = F.l1_loss(cleanMagnitude, magnet_output, reduce=False).sum((1, 2, 3)).mean(dim=0)
+        magn_loss = F.l1_loss(magnet_output, cleanMagnitude, reduce=False).sum((1, 2, 3)).mean(dim=0)
         phase_similarity = -1*F.cosine_similarity(phasenet_output, cleanPhase, dim=2).sum((1, 2)).mean(dim=0)
         
         return magn_loss, phase_similarity, magnet_output, phasenet_output
@@ -102,10 +102,12 @@ class Trainer:
             magn_loss, phase_similarity, magnet_output, phasenet_output = self.model(inputs)           
             sum_loss += magn_loss.item()
             sum_similarity += phase_similarity.item()
+            var_phase_sim = Variable(phase_similarity.data, requires_grad = True)
             var_magn_loss = Variable(magn_loss.data, requires_grad=True)
             self.optimizer.zero_grad()
             var_magn_loss.backward()
-            phase_similarity.backward()
+            var_phase_sim.backward()
+            # phase_similarity.backward()
             self.optimizer.step()
 
             if batch_id % freq == 0:
