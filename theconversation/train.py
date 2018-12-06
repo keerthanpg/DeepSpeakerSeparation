@@ -38,33 +38,33 @@ class SpeechDataset(Dataset):
 
 
 class LanguageModel(nn.Module):   
-	def __init__(self):
-		super(LanguageModel, self).__init__()
-		self.videonet = network.VideoNet()     
-		#self.videonet = videonetwork.lipreading('temporalConv')
-		#self.videonet.load_state_dict(torch.load('Video_only_model.pt'))
-		self.magnet= network.MagnitudeSubNet()
-		self.phasenet = network.PhaseSubNet()
+    def __init__(self):
+        super(LanguageModel, self).__init__()
+        self.videonet = network.VideoNet()     
+        #self.videonet = videonetwork.lipreading('temporalConv')
+        #self.videonet.load_state_dict(torch.load('Video_only_model.pt'))
+        self.magnet= network.MagnitudeSubNet()
+        self.phasenet = network.PhaseSubNet()
 
-	def forward(self, inputs):
+    def forward(self, inputs):
 
-		video = inputs[0]
-		noisyMagnitude = inputs[1]
-		cleanMagnitude = inputs[2]
-		noisyPhase = inputs[3]
-		cleanPhase = inputs[4]
-		phasenet_output = torch.tensor([]).cuda()
+        video = inputs[0]
+        noisyMagnitude = inputs[1]
+        cleanMagnitude = inputs[2]
+        noisyPhase = inputs[3]
+        cleanPhase = inputs[4]
+        phasenet_output = torch.tensor([]).cuda()
 
-		for i in range(video.shape[1]):
-			visual = video[:, i, 8:120, 8:120, :].unsqueeze(1) #batch * t * w * h * c
-			#but i want batch*t*c *w*h
-			visual = visual.contiguous().view(visual.shape[0], visual.shape[1], visual.shape[4], visual.shape[2], visual.shape[3])
-			visual = self.videonet(visual)
-			print(visual.shape)
-			#clean_magn = self.magnet(visual, noisyMagnitude) #this is buggy, Danendra's job is to get this working
-			clean_phase = torch.cat(((self.phasenet(noisyPhase[:,i].squeeze(1), cleanMagnitude[:,i].squeeze(1)).unsqueeze(1)),phasenet_output),dim=1)
+        for i in range(video.shape[1]):
+            visual = video[:, i, 8:120, 8:120, :].unsqueeze(1) #batch * t * w * h * c
+            #but i want batch*t*c *w*h
+            visual = visual.contiguous().view(visual.shape[0], visual.shape[1], visual.shape[4], visual.shape[2], visual.shape[3])
+            visual = self.videonet(visual)
+            print(visual.shape)
+            #clean_magn = self.magnet(visual, noisyMagnitude) #this is buggy, Danendra's job is to get this working
+            clean_phase = torch.cat(((self.phasenet(noisyPhase[:,i].squeeze(1), cleanMagnitude[:,i].squeeze(1)).unsqueeze(1)),phasenet_output),dim=1)
 
-		return magn_loss, phase_loss, clean_phase, clean_magn
+        return magn_loss, phase_loss, clean_phase, clean_magn
 
 # model trainer
 class Trainer:
