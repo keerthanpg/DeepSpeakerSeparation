@@ -54,14 +54,16 @@ class LanguageModel(nn.Module):
         noisyPhase = inputs[3]
         cleanPhase = inputs[4]
         phasenet_output = torch.tensor([]).cuda()
+        magnet_output = torch.tensor([]).cuda()
+
 
         for i in range(video.shape[1]):
             visual = video[:, i, 8:120, 8:120, :].unsqueeze(1) #batch * t * w * h * c
             #but i want batch*t*c *w*h
             visual = visual.contiguous().view(visual.shape[0], visual.shape[1], visual.shape[4], visual.shape[2], visual.shape[3])
             visual = self.videonet(visual)
-            print(visual.shape)
-            #clean_magn = self.magnet(visual, noisyMagnitude) #this is buggy, Danendra's job is to get this working
+            print(visual.shape) # why is this 32 x 2048?? Fix it Keerthana!
+            clean_magn = torch.cat(((self.magnet(visual, noisyMagnitude[:,i]).unsqueeze(1)),magnet_output),dim = 1) #this is buggy, Danendra's job is to get this working
             clean_phase = torch.cat(((self.phasenet(noisyPhase[:,i].squeeze(1), cleanMagnitude[:,i].squeeze(1)).unsqueeze(1)),phasenet_output),dim=1)
 
         return magn_loss, phase_loss, clean_phase, clean_magn

@@ -80,9 +80,9 @@ class MagnitudeSubNet(nn.Module):
         #determine input channel dimension
         for i in range(5):
             if(i % 2 != 0):
-                 self.ares.append(ResidualBlock(1536, 1536, 2))
+                 self.ares.append(ResidualBlock(80, 80))
             else:
-                self.ares.append(ResidualBlock(1536, 1536))
+                self.ares.append(ResidualBlock(80, 80))
 
         
         self.magn_res = []
@@ -94,14 +94,14 @@ class MagnitudeSubNet(nn.Module):
 
         
     def forward(self, visual, audio):
-        for block in self.vres:
-            visual = block(visual)
+        # for block in self.vres:
+        #     visual = block(visual)
 
         for block in self.ares:
             audio = block(audio)
 
-        # need to figure out the exact dimension of concatenation
-        magn_feats = torch.cat(visual, audio, dim = 1)
+        # concatenation over channels
+        magn_feats = torch.cat(visual, audio, dim = -1)
 
         for block in self.magn_res:
             magn_feats = block(magn_feats)
