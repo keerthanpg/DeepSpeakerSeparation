@@ -56,9 +56,6 @@ class LanguageModel(nn.Module):
         cleanPhase = inputs[4]
         phasenet_output = torch.tensor([]).cuda()
         magnet_output = torch.tensor([]).cuda()
-        print(cleanPhase.shape)
-
-
 
         for i in range(video.shape[1]):
             visual = video[:, i, 8:120, 8:120, :].unsqueeze(1) #batch * t * w * h * c
@@ -70,14 +67,10 @@ class LanguageModel(nn.Module):
             clean_phase = self.phasenet(noisyPhase[:,i].squeeze(1), cleanMagnitude[:,i].squeeze(1)).unsqueeze(1)
             phasenet_output = torch.cat((phasenet_output, clean_phase), dim=1)
 
+        magn_loss = F.l1_loss(cleanMagnitude, cleanMagnitude, reduce=False).sum((1, 2, 3))
+        phase_similarity = F.cosine_similarity(phasenet_output, cleanPhase, dim=2).sum((1, 2))
         
-        print(phasenet_output.shape)    
-
-        phase_similarity = F.cosine_similarity(input1, input2)
-
-
-
-        return magn_loss, phase_similarity, clean_phase, clean_magn
+        return magn_loss, phase_similarity, magnet_output, phasenet_output
 
 # model trainer
 class Trainer:
