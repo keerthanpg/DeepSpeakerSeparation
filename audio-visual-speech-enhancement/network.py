@@ -27,10 +27,11 @@ class SpeechEnhancementNetwork(object):
 
 		audio_input = Input(shape=extended_audio_spectrogram_shape)
 		video_input = Input(shape=video_shape)
+		phase_input = Input(shape=extended_audio_spectrogram_shape)
 
-		audio_output = decoder(encoder([audio_input, video_input]))
+		audio_output = decoder(encoder([audio_input, video_input,phase_input]))
 
-		model = Model(inputs=[audio_input, video_input], outputs=audio_output)
+		model = Model(inputs=[audio_input, video_input,phase_input], outputs=audio_output)
 
 		optimizer = optimizers.adam(lr=5e-4)
 		model.compile(loss='mean_squared_error', optimizer=optimizer)
@@ -40,8 +41,9 @@ class SpeechEnhancementNetwork(object):
 		return SpeechEnhancementNetwork(model)
 
 	@classmethod
-	def __build_encoder(cls, extended_audio_spectrogram_shape, video_shape):
+	def __build_encoder(cls, extended_audio_spectrogram_shape, video_shape,phase_input):
 		audio_input = Input(shape=extended_audio_spectrogram_shape)
+		phase_input = Input(shape=extended_audio_spectrogram_shape)
 		video_input = Input(shape=video_shape)
 
 		audio_embedding_matrix = cls.__build_audio_encoder(audio_input)
@@ -49,15 +51,18 @@ class SpeechEnhancementNetwork(object):
 
 		video_embedding_matrix = cls.__build_video_encoder(video_input)
 		video_embedding = Flatten()(video_embedding_matrix)
+		
+		phase_embedding_matrix = cls.__build_phase_encoder(phase_input)
+		phase_embedding = Flatten()(phase_embedding_matrix)
 
-		x = concatenate([audio_embedding, video_embedding])
+		x = concatenate([audio_embedding, video_embedding,phase_embedding])
 		shared_embedding_size = int(x._keras_shape[1] / 4)
 
 		x = Dense(shared_embedding_size)(x)
 		x = BatchNormalization()(x)
 		shared_embedding = LeakyReLU()(x)
 
-		model = Model(inputs=[audio_input, video_input], outputs=shared_embedding)
+		model = Model(inputs=[audio_input,video_input,phase_input], outputs=shared_embedding)
 		model.summary()
 
 		return model, shared_embedding_size, audio_embedding_matrix.shape[1:].as_list()
@@ -107,6 +112,31 @@ class SpeechEnhancementNetwork(object):
 		x = LeakyReLU()(x)
 
 		return x
+
+	@staticmethod
+	def __build_phase_encoder(audio_input):
+		x = Convolution2D(64, kernel_size=(5, 5), strides=(2, 2), padding='same')(audio_input)
+		x = BatchNormalization()(x)
+		x = LeakyReLU()(x)
+
+		x = Convolution2D(64, kernel_size=(4, 4), strides=(1, 1), padding='same')(x)
+		x = BatchNormalization()(x)
+		x = LeakyReLU()(x)
+
+		x = Convolution2D(128, kernel_size=(4, 4), strides=(2, 2), padding='same')(x)
+		x = BatchNormalization()(x)
+		x = LeakyReLU()(x)
+
+		x = Convolution2D(128, kernel_size=(2, 2), strides=(2, 1), padding='same')(x)
+		x = BatchNormalization()(x)
+		x = LeakyReLU()(x)
+
+		x = Convolution2D(128, kernel_size=(2, 2), strides=(2, 1), padding='same')(x)
+		x = BatchNormalization()(x)
+		x = LeakyReLU()(x)
+
+		return x
+
 
 	@staticmethod
 	def __build_audio_decoder(embedding):
@@ -174,12 +204,13 @@ class SpeechEnhancementNetwork(object):
 
 		return x
 
-	def train(self, train_mixed_spectrograms, train_video_samples, train_speech_spectrograms,
-			  validation_mixed_spectrograms, validation_video_samples, validation_speech_spectrograms,
+	def train(self, train_mixed_spectrograms, train_video_samples, train_speech_spectrograms,train_phase_spectograms,
+			  validation_mixed_spectrograms, validation_video_samples, validation_speech_spectrograms,validation_phase_spectrograms
 			  model_cache_path, tensorboard_dir):
 
 		train_mixed_spectrograms = np.expand_dims(train_mixed_spectrograms, -1)  # append channels axis
-		train_speech_spectrograms = np.expand_dims(train_speech_spectrograms, -1)  # append channels axis
+		train_speech_spectrograms = np.expand_dims(train_speech_spectrograms, -1)
+		train_phase_spectograms = np.expand_dims(train_phase_spectograms, -1)																	  # append channels axis
 
 		validation_mixed_spectrograms = np.expand_dims(validation_mixed_spectrograms, -1)  # append channels axis
 		validation_speech_spectrograms = np.expand_dims(validation_speech_spectrograms, -1)  # append channels axis
@@ -192,11 +223,11 @@ class SpeechEnhancementNetwork(object):
 		tensorboard = TensorBoard(log_dir=tensorboard_dir, histogram_freq=0, write_graph=True, write_images=True)
 
 		self.__model.fit(
-			x=[train_mixed_spectrograms, train_video_samples],
+			x=[train_mixed_spectrograms, train_video_samples, train_phase_spectograms],
 			y=train_speech_spectrograms,
 
 			validation_data=(
-				[validation_mixed_spectrograms, validation_video_samples],
+				[validation_mixed_spectrograms, validation_video_samples,validation_phase_spectrograms],
 				validation_speech_spectrograms
 			),
 
@@ -205,16 +236,18 @@ class SpeechEnhancementNetwork(object):
 			verbose=1
 		)
 
-	def predict(self, mixed_spectrograms, video_samples):
-		mixed_spectrograms = np.expand_dims(mixed_spectrograms, -1)  # append channels axis
-		speech_spectrograms = self.__model.predict([mixed_spectrograms, video_samples])
+
+	def predict(self, mixed_spectrograms, video_samples,phase_input):
+		mixed_spectrograms = np.expand_dims(mixed_spectrograms, -1) 
+		phase_input = np.expand_dims(phase_input,-1) # append channels axis
+		speech_spectrograms = self.__model.predict([mixed_spectrograms, video_samples,phase_input])
 
 		return np.squeeze(speech_spectrograms)
 
-	def evaluate(self, mixed_spectrograms, video_samples, speech_spectrograms):
+	def evaluate(self, mixed_spectrograms, video_samples, speech_spectrograms,phase_input):
 		mixed_spectrograms = np.expand_dims(mixed_spectrograms, -1)  # append channels axis
 		speech_spectrograms = np.expand_dims(speech_spectrograms, -1)  # append channels axis
-		
+		phase_input = np.ex
 		loss = self.__model.evaluate(x=[mixed_spectrograms, video_samples], y=speech_spectrograms)
 
 		return loss
@@ -222,6 +255,7 @@ class SpeechEnhancementNetwork(object):
 	@staticmethod
 	def load(model_cache_path):
 		model = load_model(model_cache_path)
+
 		return SpeechEnhancementNetwork(model)
 
 	def save(self, model_cache_path):
