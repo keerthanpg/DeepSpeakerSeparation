@@ -36,10 +36,10 @@ def train(args):
 	validation_preprocessed_blob_paths = [assets.get_preprocessed_blob_path(d) for d in args.validation_data_names]
 
 	train_samples = load_preprocessed_blobs(train_preprocessed_blob_paths)
-	train_video_samples, train_mixed_spectrograms, train_speech_spectrograms = make_sample_set(train_samples)
+	train_video_samples, train_mixed_spectrograms, train_speech_spectrograms, train_noisy_phase = make_sample_set(train_samples)
 
 	validation_samples = load_preprocessed_blobs(validation_preprocessed_blob_paths)
-	validation_video_samples, validation_mixed_spectrograms, validation_speech_spectrograms = make_sample_set(validation_samples)
+	validation_video_samples, validation_mixed_spectrograms, validation_speech_spectrograms, validation_noisy_phase = make_sample_set(validation_samples)
 
 	video_normalizer = data_processor.VideoNormalizer(train_video_samples)
 	video_normalizer.normalize(train_video_samples)
@@ -72,11 +72,12 @@ def predict(args):
 			print("predicting (%s, %s)..." % (sample.video_file_path, sample.noise_file_path))
 
 			video_normalizer.normalize(sample.video_samples)
+			zeros = np.ones_like(sample.video_samples)
 
-			loss = network.evaluate(sample.mixed_spectrograms, sample.video_samples, sample.speech_spectrograms)
+			loss = network.evaluate(sample.mixed_spectrograms, zeros, sample.speech_spectrograms)
 			print("loss: %f" % loss)
 
-			predicted_speech_spectrograms = network.predict(sample.mixed_spectrograms, sample.video_samples)
+			predicted_speech_spectrograms = network.predict(sample.mixed_spectrograms, zeros)
 
 			predicted_speech_signal = data_processor.reconstruct_speech_signal(
 				sample.mixed_signal, predicted_speech_spectrograms, sample.video_frame_rate
@@ -250,15 +251,19 @@ def make_sample_set(samples, max_samples=None):
 	mixed_spectrograms = np.concatenate([sample.mixed_spectrograms for sample in samples], axis=0)
 	speech_spectrograms = np.concatenate([sample.speech_spectrograms for sample in samples], axis=0)
 
+	noisy_phase = np.concatenate([sample.noise_phase for sample in samples], axis=0)
+
 	permutation = np.random.permutation(video_samples.shape[0])
 	video_samples = video_samples[permutation]
 	mixed_spectrograms = mixed_spectrograms[permutation]
 	speech_spectrograms = speech_spectrograms[permutation]
+	noisy_phase = noisy_phase[permutation]
 
 	return (
 		video_samples,
 		mixed_spectrograms,
-		speech_spectrograms
+		speech_spectrograms,
+		noisy_phase
 	)
 
 
